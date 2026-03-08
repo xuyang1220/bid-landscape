@@ -27,3 +27,4 @@ Thumbs.db
 *.log
 artifacts/
 notebooks/ignore.txt
+images/

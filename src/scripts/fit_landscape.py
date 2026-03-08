@@ -1,6 +1,6 @@
 import numpy as np
 from src.piecewise_landscape import make_log_price_bins, simulate_censored_auctions, sample_piecewise_market, sample_bids_from_value_model, PiecewiseSurvivalLandscape
-
+import src.plots as plots
 # --------------------------------------
 # Example usage
 # --------------------------------------
@@ -41,10 +41,10 @@ def main() -> None:
     model.fit(data, lr=0.08, n_epochs=250, verbose=True)
 
     # 6) Compare recovered CDF on one segment
-    seg = 0
-    summary = model.true_vs_estimated_summary(market.cdf_true, segment_id=seg)
-    mae = summary["abs_err"].mean()
-    print(f"\nsegment={seg}  CDF bin-wise MAE={mae:.4f}")
+    for seg in range(8):
+        summary = model.true_vs_estimated_summary(market.cdf_true, segment_id=seg)
+        mae = summary["abs_err"].mean()
+        print(f"\nsegment={seg}  CDF bin-wise MAE={mae:.4f}")
 
     # 7) Query p_win / expected_spend
     test_bids = np.array([0.05, 0.10, 0.25, 0.50, 1.0, 2.0, 5.0])
@@ -54,6 +54,16 @@ def main() -> None:
     print("\nSample landscape:")
     for b, pw, es in zip(test_bids, pwin, esp):
         print(f"bid={b:>5.2f}  p_win={pw:>7.4f}  expected_spend={es:>7.4f}")
+    
+    # 8) Plots
+    # Single segment diagnostic
+    plots.plot_true_vs_estimated_curves(model, market, segment_id=0)
+
+    # Multi-segment overlay
+    plots.plot_multiple_segments(model, market, segments=[0, 1, 2, 3])
+
+    # Estimated spend error ratio.
+    plots.plot_spend_ratio(model, market, segment_id=0)
 
 if __name__ == "__main__":
     main()
