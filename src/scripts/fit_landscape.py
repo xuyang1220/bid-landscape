@@ -39,6 +39,8 @@ def main() -> None:
         random_state=3,
     )
     model.fit(data, lr=0.08, n_epochs=250, verbose=True)
+    model.fit_bin_mean_price(data, min_count=20)
+    print(model.bin_mean_price)
 
     # 6) Compare recovered CDF on one segment
     for seg in range(8):

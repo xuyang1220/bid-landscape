@@ -177,14 +177,53 @@ class PiecewiseSurvivalLandscape:
         out = np.where(bid_flat >= edges[-1], 1.0, out)
         return out.reshape(np.shape(bid_arr))
 
+    # def expected_spend(
+    #     self,
+    #     bid: np.ndarray | float,
+    #     segment_id: np.ndarray | int,
+    #     use_bin_midpoints: bool = True,
+    # ) -> np.ndarray:
+    #     """
+    #     Approximate E[price * 1{price <= bid} | segment].
+    #     """
+    #     bid_arr = np.asarray(bid, dtype=float)
+    #     seg_arr = np.asarray(segment_id, dtype=int)
+
+    #     bid_flat = np.atleast_1d(bid_arr)
+    #     seg_flat = np.atleast_1d(seg_arr)
+    #     if seg_flat.size == 1 and bid_flat.size > 1:
+    #         seg_flat = np.full_like(bid_flat, seg_flat.item(), dtype=int)
+    #     if bid_flat.shape != seg_flat.shape:
+    #         raise ValueError("bid and segment_id must have compatible shapes.")
+
+    #     pmf = self.pmf_all()[seg_flat]  # [B, K]
+    #     centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:]) if use_bin_midpoints else self.bin_edges[1:]
+
+    #     idx = find_price_bin(bid_flat, self.bin_edges)
+    #     mask = np.arange(self.k)[None, :] < idx[:, None]
+    #     out = (pmf * centers[None, :] * mask).sum(axis=1)
+
+    #     # partial last bin
+    #     left = self.bin_edges[idx]
+    #     right = self.bin_edges[idx + 1]
+    #     frac = (bid_flat - left) / np.maximum(right - left, 1e-12)
+    #     frac = np.clip(frac, 0.0, 1.0)
+    #     out += pmf[np.arange(len(idx)), idx] * centers[idx] * frac
+
+    #     out = np.where(bid_flat <= self.bin_edges[0], 0.0, out)
+    #     return out.reshape(np.shape(bid_arr))
+
     def expected_spend(
         self,
         bid: np.ndarray | float,
         segment_id: np.ndarray | int,
-        use_bin_midpoints: bool = True,
     ) -> np.ndarray:
         """
-        Approximate E[price * 1{price <= bid} | segment].
+        Approximate E[price * 1{price <= bid} | segment] using
+        per-segment bin mean price estimates instead of bin midpoints.
+
+        Requires:
+            self.bin_mean_price: array of shape [n_segments, K]
         """
         bid_arr = np.asarray(bid, dtype=float)
         seg_arr = np.asarray(segment_id, dtype=int)
@@ -196,22 +235,85 @@ class PiecewiseSurvivalLandscape:
         if bid_flat.shape != seg_flat.shape:
             raise ValueError("bid and segment_id must have compatible shapes.")
 
-        pmf = self.pmf_all()[seg_flat]  # [B, K]
-        centers = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:]) if use_bin_midpoints else self.bin_edges[1:]
+        if not hasattr(self, "bin_mean_price"):
+            raise AttributeError(
+                "self.bin_mean_price is required. "
+                "Estimate per-segment bin mean prices first."
+            )
+
+        pmf = self.pmf_all()[seg_flat]                    # [B, K]
+        bin_means = self.bin_mean_price[seg_flat]        # [B, K]
 
         idx = find_price_bin(bid_flat, self.bin_edges)
+
+        # fully included bins
         mask = np.arange(self.k)[None, :] < idx[:, None]
-        out = (pmf * centers[None, :] * mask).sum(axis=1)
+        out = (pmf * bin_means * mask).sum(axis=1)
 
         # partial last bin
         left = self.bin_edges[idx]
         right = self.bin_edges[idx + 1]
         frac = (bid_flat - left) / np.maximum(right - left, 1e-12)
         frac = np.clip(frac, 0.0, 1.0)
-        out += pmf[np.arange(len(idx)), idx] * centers[idx] * frac
+
+        out += pmf[np.arange(len(idx)), idx] * bin_means[np.arange(len(idx)), idx] * frac
 
         out = np.where(bid_flat <= self.bin_edges[0], 0.0, out)
         return out.reshape(np.shape(bid_arr))
+    
+    def fit_bin_mean_price(
+        self,
+        data: CensoredAuctionDataset,
+        min_count: int = 20,
+    ) -> None:
+        """
+        Estimate E[price | segment, bin] from winning auctions.
+
+        Fallback order for sparse bins:
+        1. segment-bin mean
+        2. global bin mean
+        3. bin midpoint
+        """
+        seg = data.segment_id.astype(int)
+        is_win = data.is_win.astype(bool)
+        event_bin = data.event_bin.astype(int)
+        price = data.observed_price.astype(float)
+
+        k = self.k
+        s = self.n_segments
+
+        # segment-bin sums / counts
+        sum_sb = np.zeros((s, k), dtype=float)
+        cnt_sb = np.zeros((s, k), dtype=float)
+
+        win_seg = seg[is_win]
+        win_bin = event_bin[is_win]
+        win_price = price[is_win]
+
+        np.add.at(sum_sb, (win_seg, win_bin), win_price)
+        np.add.at(cnt_sb, (win_seg, win_bin), 1.0)
+
+        # global bin sums / counts
+        sum_b = np.zeros(k, dtype=float)
+        cnt_b = np.zeros(k, dtype=float)
+        np.add.at(sum_b, win_bin, win_price)
+        np.add.at(cnt_b, win_bin, 1.0)
+
+        # means
+        global_mid = 0.5 * (self.bin_edges[:-1] + self.bin_edges[1:])
+        global_bin_mean = np.where(cnt_b > 0, sum_b / np.maximum(cnt_b, 1.0), global_mid)
+
+        bin_mean_price = np.zeros((s, k), dtype=float)
+        for seg_id in range(s):
+            for bin_id in range(k):
+                if cnt_sb[seg_id, bin_id] >= min_count:
+                    bin_mean_price[seg_id, bin_id] = sum_sb[seg_id, bin_id] / cnt_sb[seg_id, bin_id]
+                elif cnt_b[bin_id] > 0:
+                    bin_mean_price[seg_id, bin_id] = global_bin_mean[bin_id]
+                else:
+                    bin_mean_price[seg_id, bin_id] = global_mid[bin_id]
+
+        self.bin_mean_price = bin_mean_price
 
     # ----------------------------
     # Training
