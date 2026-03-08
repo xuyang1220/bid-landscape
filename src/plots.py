@@ -186,3 +186,34 @@ def plot_spend_ratio(
 
     plt.savefig(IMAGES / "spend_ratio2.png", dpi=150)
     plt.show()
+
+def plot_km_vs_true(
+    km_seg,
+    market,
+    segment_id: int,
+    n_grid: int = 200,
+):
+    seg_mask = market.segment_id == segment_id
+    seg_prices = market.prices[seg_mask]
+
+    bid_grid = np.exp(
+        np.linspace(
+            np.log(market.bin_edges[0]),
+            np.log(market.bin_edges[-1]),
+            n_grid,
+        )
+    )
+
+    true_curve = true_p_win_from_prices(seg_prices, bid_grid)
+    km_curve = km_seg.p_win(bid_grid, segment_id=segment_id)
+
+    plt.figure(figsize=(8, 5))
+    plt.semilogx(bid_grid, true_curve, label="True win curve")
+    plt.semilogx(bid_grid, km_curve, label="Kaplan-Meier estimate")
+    plt.xlabel("Bid")
+    plt.ylabel("P(win | bid, segment)")
+    plt.title(f"True vs Kaplan-Meier Win Curve (segment={segment_id})")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+    plt.tight_layout()
+    plt.show()
