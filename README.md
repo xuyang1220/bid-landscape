@@ -165,6 +165,10 @@ bid = 1000 * p_conv * shadow_tcpa * alpha_pace
 
 We tested robustness using market shocks:
 
+## Traffic shock
+
+Auction per minutes double.
+
 ## Price shock
 
 Market prices double.
