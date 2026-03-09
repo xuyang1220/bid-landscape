@@ -1,4 +1,4 @@
-# Bid Landscape Estimation & Simulation (1-Page Summary)
+# Piecewise Bid Landscape Estimation & Simulation 
 
 This project builds a **synthetic auction environment and bid landscape estimator** similar to the components used in modern DSP / ads bidding systems.  
 The goal is to understand how **censored auction observations → bid landscape estimation → bidding / pacing control** interact.
