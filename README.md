@@ -179,7 +179,12 @@ Cheap inventory disappears and expensive segments dominate.
 
 Segment-level landscapes correctly track spend under these shifts, while global landscapes fail.
 
-# 9. Key Findings
+# 9. Other Key Features Simulated
+
+- Mixture bid landscapes, fit using EM algorithm
+- Bayesian shrinkage across segments
+
+# 10. Key Findings
 ## Segment-level HDMI landscapes are important
 
 Global landscapes cannot handle supply mix shifts.
@@ -210,7 +215,7 @@ Max Conversions vs tCPA: Max Conversions typically yields:
 
 - less predictable CPA
 
-# 10. Future Extensions
+# 11. Future Extensions
 
 Potential improvements:
 
