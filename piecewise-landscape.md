@@ -13,7 +13,7 @@ $$
 Z = \text{market price}
 $$
 
-We place a bid \(b\).
+We place a bid ***b***.
 
 Observation:
 
