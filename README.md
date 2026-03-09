@@ -142,7 +142,7 @@ No explicit CPA constraint.
 # 7. Shadow tCPA Design
 A realistic Max Conversions implementation uses:
 
-Slow loop (every ~6 hours)
+## Slow loop (every ~6 hours)
 
 Solve shadow tCPA
 $$
@@ -150,7 +150,7 @@ b_i = 1000 \cdot p_i \cdot tCPA_{\text{shadow}}
 $$
 so expected spend matches budget.
 
-Fast loop (minutes)
+## Fast loop (minutes)
 
 Apply pacing:
 ```
@@ -165,24 +165,24 @@ bid = 1000 * p_conv * shadow_tcpa * alpha_pace
 
 We tested robustness using market shocks:
 
-Price shock
+## Price shock
 
 Market prices double.
 
-Segment mix shift
+## Segment mix shift
 
 Cheap inventory disappears and expensive segments dominate.
 
 Segment-level landscapes correctly track spend under these shifts, while global landscapes fail.
 
 # 9. Key Findings
-Segment-level HDMI landscapes are important
+## Segment-level HDMI landscapes are important
 
 Global landscapes cannot handle supply mix shifts.
 
 Segment conditioning fixes expected spend prediction.
 
-Expected spend ≠ realized spend
+## Expected spend ≠ realized spend
 
 Differences arise from:
 
